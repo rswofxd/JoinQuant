@@ -51,24 +51,26 @@ def handle_data(context,data):
         for stock in g.stock:
             order_target_value(stock,0) # 按照目标价值下单，即调整仓位到0元
             log.info("Sell %s for stoploss" %stock)
-        return
-    for stock in g.stock: # 非系统风险下，即index_return >= -0.03情况
-    	his = history(6,'1d','close',[stock],df =False) # 获取股票池中各股票过去6天平均收盘价
+        return # 止损，返回并退出handle_data()函数
+    for stock in g.stock: # 非系统风险下，即index_return >= -0.03情况对各股票处理
+    	his = history(6,'1d','close',[stock],df =False) # 获取股票池中各股票过去6天每天的平均收盘价，共返回6行数据，dict类型
     	cnt = 0
-    	for i in range(len(his[stock])-1):
-    		daily_returns = (his[stock][i+1] - his[stock][i])/his[stock][i]
+    	for i in range(len(his[stock])-1): # len()函数返回列表元素个数，i＝0～5
+    		daily_returns = (his[stock][i+1] - his[stock][i])/his[stock][i] # 计算过去6天中，每天的涨跌情况
     		if daily_returns <0:
     			cnt += 1
     	if cnt == 5:
-    		return
-    	#2.大于5日平均或10日平均20%以上
-    	current_price = data[stock].price
-    	mavg5 = data[stock].mavg(5)
+    		return # 如果6天中全部下跌，则返回并退出handle_data()函数
+    	
+        #2.大于5日平均或10日平均20%以上
+    	current_price = data[stock].price # data对象即为SecurityUnitData对象，表示单位时间内股票数据
+    	mavg5 = data[stock].mavg(5) # 获取过去5天收盘价平均值
     	print mavg5
-    	mavg10 = data[stock].mavg(10)
+    	mavg10 = data[stock].mavg(10) # 获取过去10天收盘价平均值
     	if current_price > 1.2*mavg5 or current_price > 1.2*mavg10:
-    		return
-    	#建仓，5步法、将头寸5等分，每下跌2%加一部分
+    		return # 当前价大于5日平均或10日平均20%以上，则返回并退出handle_data()函数
+    	
+        #建仓，5步法、将头寸5等分，每下跌2%加一部分
     	cash = context.portfolio.cash
     	amount = int(g.cash/g.count*2/current_price/300)
     	returns = data[stock].returns
