@@ -46,43 +46,46 @@ def handle_data(context,data):
     # 计算并打印回撤指数＝（昨天收盘价－今天收盘价）／今天收盘价，大于0表示下跌，小于0表示上涨
     index_return = (hist1['close'][-1]-hist1['close'][0])/hist1['close'][0]
     print hist1,index_return
-    # 如果上证指数上涨3%，则全部卖出止损，否则，对股票池中股票分别进行如下操作
-    if  index_return<= -0.03:
+    # 1.1 如果上证指数上涨3%，则全部卖出止损，否则，对股票池中股票分别进行如下操作
+    if  index_return <= -0.03:
         for stock in g.stock:
             order_target_value(stock,0) # 按照目标价值下单，即调整仓位到0元
             log.info("Sell %s for stoploss" %stock)
         return # 止损，返回并退出handle_data()函数
-    for stock in g.stock: # 非系统风险下，即index_return >= -0.03情况对各股票处理
-    	his = history(6,'1d','close',[stock],df =False) # 获取股票池中各股票过去6天每天的平均收盘价，共返回6行数据，dict类型
+    for stock in g.stock: # 2. 非系统风险下，即index_return >= -0.03情况对各股票处理
+    	his = history(6,'1d','close',[stock],df=False) # 获取股票池中各股票过去6天每天的平均收盘价，共返回6行数据，dict类型
     	cnt = 0
     	for i in range(len(his[stock])-1): # len()函数返回列表元素个数，i＝0～5
     		daily_returns = (his[stock][i+1] - his[stock][i])/his[stock][i] # 计算过去6天中，每天的涨跌情况
-    		if daily_returns <0:
+    		if daily_returns < 0:
     			cnt += 1
     	if cnt == 5:
-    		return # 如果6天中全部下跌，则返回并退出handle_data()函数
+    		return # 2.1 如果6天中全部下跌，则返回并退出handle_data()函数
     	
-        #2.大于5日平均或10日平均20%以上
+        # 2.2 大于5日平均或10日平均20%以上
     	current_price = data[stock].price # data对象即为SecurityUnitData对象，表示单位时间内股票数据
-    	mavg5 = data[stock].mavg(5) # 获取过去5天收盘价平均值
+    	mavg5 = data[stock].mavg(5) # 获取过去5天收盘价平均值，mavg()为data对象的方法
     	print mavg5
     	mavg10 = data[stock].mavg(10) # 获取过去10天收盘价平均值
     	if current_price > 1.2*mavg5 or current_price > 1.2*mavg10:
     		return # 当前价大于5日平均或10日平均20%以上，则返回并退出handle_data()函数
     	
-        #建仓，5步法、将头寸5等分，每下跌2%加一部分
-    	cash = context.portfolio.cash
+        # 2.3 建仓，5步法、将头寸5等分，每下跌2%加一部分
+    	cash = context.portfolio.cash # portfolio表示subportfolios汇总账户信息
     	amount = int(g.cash/g.count*2/current_price/300)
-    	returns = data[stock].returns
+    	returns = data[stock].returns # 获取股票单位时间收益，(close - preclose)/preclose，close表示当前收盘价，preclose表示之前收盘价
+        # 收益率大于1%，且该股票多单仓位小于资金分配额度的50%，则投入所分配资金额度的1/5，positions表示多单或购买单
     	if returns > 0.01 and context.portfolio.positions[stock].amount < 300*amount and cash > 0:
-    		order_value(stock,g.cash/g.count/5)
+    		order_value(stock,g.cash/g.count/5) # 按价值下单，购买相应资金的股票
     		log.info("Buying %s"%stock)
-    	#跌10%的严格止损, 或者整体收益大于10%（止盈）
-    	cost = context.portfolio.positions[stock].avg_cost
+    	
+        # 2.4 跌10%的严格止损, 或者整体收益大于10%（止盈）
+    	cost = context.portfolio.positions[stock].avg_cost # 获取该股票所有买入价格的加权平均值
     	if cost != 0:
-    	    security_returns = (current_price-cost)/cost
+    	    security_returns = (current_price-cost)/cost # 计算该股票的收益率
+            # 亏损大于5%，或者盈利大于15%，则空仓卖出，实现止损或者止赢
     	    if security_returns < -0.05 or security_returns > 0.15:
-    	        order_target_value(stock,0)
+    	        order_target_value(stock,0) # 空仓出货
     	        log.info("Selling %s" % stock)
 		#根据大盘止损
 		
