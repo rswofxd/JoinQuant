@@ -22,6 +22,34 @@ def set_params():
     g.ETF300 = '510300.XSHG'#'510300.XSHG'
     g.ETF500 = '510500.XSHG'#'510500.XSHG'
 
+    g.cash = 10,0000
+    g.invest = g.cash * 2/3
+    g.industry_invest = g.invest * 3%
+
+    g,count = 20
+    g.stocks = get_index_stocks('000300.XSHG')
+
+    q = query(\
+        valuation.code, valuation.market_cap, valuation.pe_ratio, valuation.pb_ratio\
+    ).filter(\
+        valuation.code.in_(g.stocks),
+        valuation.pe_ratio < 20,
+        valuation.pb_ratio < 2\
+    ).order_by(\
+        valuation.market_cap.asc()\
+    ).limit(\
+        g.count\
+    )
+
+    # 获取所选取股票财务数据
+    df = get_fundamentals(q)
+
+    # 列出所选股票的股票代码，并赋值给全局股票变量g.stocks，获得最终选股列表
+    g.stocks = list(df['code'])
+
+    # 设置股票池，该函数已废弃
+    set_universe(list(df['code']))
+
 
 #2 设置中间变量
 def set_variables():
