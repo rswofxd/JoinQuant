@@ -111,13 +111,32 @@ def handle_data(context, data):
         
         if signal == 'sell_the_stocks':
             sell_the_stocks(context)
-        elif signal == 'ETF300' or signal == 'ETF500':
+        elif signal >0 :
             buy_the_stocks(context,signal)
 
 #5
 #获取信号
-def get_signal(context):
-    
+def get_signal(context):    
+    for stock in g.stocks:
+        #查询每只股票的pb，pe值
+        pb = query(valuation.pb_ratio).filter(valuation.code.in_(stock))
+        pe = query(valuation.pe_ratio).filter(valuation.code.in_(stock))
+        #计算投资胜算概率p
+        if (pb <= 1 and pe <=10):
+            p = 0.95
+        elif (pb >1 and pb <=1.5) and (pe >10 and pe <=15):
+            p = 0.8
+        elif (pb >1.5 and pb <=2) and (pe >15 and pe <=20):
+            p = 0.8
+        elif (pb >2 and pe >20):
+            p = price_rise(stock,365)
+        else:
+            p = 0.5
+        #计算绝对胜算概率x
+        x = 2*p -1
+        return x
+
+
     #沪深300与中证500的当日收盘价
     hs300,cp300 = getStockPrice(g.hs, g.lag)
     zz500,cp500  = getStockPrice(g.zz, g.lag)
@@ -137,11 +156,26 @@ def get_signal(context):
         return 'ETF500'
 
 #6
-#取得股票某个区间内的所有收盘价（用于取前20日和当前 收盘价）
+#取得股票某个区间内的所有收盘价（用于取前20日和当前收盘价）
 def getStockPrice(stock, interval):
     h = attribute_history(stock, interval, unit='1d', fields=('close'), skip_paused=True)
     return (h['close'].values[0],h['close'].values[-1])
 
+
+def price_rise(stock,interval):
+    low_price = get_price(stock, count = interval, frequency='daily', fields=['low'])
+    current_price = getStockPrice(stock, 2)
+    ratio = current_price / low_price
+    if (ratio >= 1.0 and ratio < 2.0):
+        return 2
+    elif (atio >= 2.0 and ratio < 3.0):
+        return 3
+    elif (atio >= 3.0 and ratio < 4.0):
+        return 4
+    elif (atio >= 4.0 and ratio < 5.0):
+        return 5
+    else:
+        return 6
 #7
 #卖出股票
 def sell_the_stocks(context):
